@@ -481,6 +481,11 @@ static void imx_ldb_encoder_enable(struct drm_encoder *encoder)
 	int dual = ldb->ldb_ctrl & LDB_SPLIT_MODE_EN;
 	int mux = drm_of_encoder_active_port_id(imx_ldb_ch->child, encoder);
 
+	if (mux < 0 || mux >= ARRAY_SIZE(ldb->clk_sel)) {
+		dev_warn(ldb->dev, "%s: invalid mux %d\n", __func__, mux);
+		return;
+	}
+
 	drm_panel_prepare(imx_ldb_ch->panel);
 
 	if (ldb->is_imx8) {
@@ -585,6 +590,11 @@ imx_ldb_encoder_atomic_mode_set(struct drm_encoder *encoder,
 	unsigned long di_clk = mode->clock * 1000;
 	int mux = drm_of_encoder_active_port_id(imx_ldb_ch->child, encoder);
 	u32 bus_format = imx_ldb_ch->bus_format;
+
+	if (mux < 0 || mux >= ARRAY_SIZE(ldb->clk_sel)) {
+		dev_warn(ldb->dev, "%s: invalid mux %d\n", __func__, mux);
+		return;
+	}
 
 	if (mode->clock > ldb->max_prate_dual_mode) {
 		dev_warn(ldb->dev,
@@ -785,7 +795,7 @@ static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
 		imx_ldb_ch->phy_is_on = false;
 	}
 
-	if (imx_ldb_ch == &ldb->channel[0])
+	if (imx_ldb_ch == &ldb->channel[0] || dual)
 		ldb->ldb_ctrl &= ~LDB_CH0_MODE_EN_MASK;
 	if (imx_ldb_ch == &ldb->channel[1] || dual)
 		ldb->ldb_ctrl &= ~LDB_CH1_MODE_EN_MASK;
@@ -803,7 +813,7 @@ static void imx_ldb_encoder_disable(struct drm_encoder *encoder)
 			clk_disable_unprepare(ldb->clk_aux_pixel);
 		}
 	} else {
-		if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
+		if (dual) {
 			clk_disable_unprepare(ldb->clk[0]);
 			clk_disable_unprepare(ldb->clk[1]);
 		}
